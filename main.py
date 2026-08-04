@@ -48,7 +48,7 @@ def main():
     ]
 
     while True:
-        user_input = read_input("You: ")
+        user_input = read_input("\nYou: ")
 
         if user_input is None or user_input.lower() in {"exit", "quit"}:
             return 0
@@ -64,45 +64,63 @@ def main():
             }
         )
 
-        try:
-            completion = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
-                extra_body={
-                    "reasoning": {
-                        "effort": "low",
-                        "exclude": True,
-                    }
-                },
-            )
-        except OpenAIError as error:
-            messages.pop()
-            print(f"Request failed: {error}")
-            continue
+        stream = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            stream=True,
+            stream_options={"include_usage": True},
+            extra_body={
+                "reasoning": {
+                    "effort": "low",
+                    "exclude": True,
+                }
+            },
+        )
 
-        if not completion.choices:
-            messages.pop()
-            print("Request failed: the provider returned no response choices.")
-            continue
+        usage = None
+        answer = []
 
-        choice = completion.choices[0]
-        answer = choice.message.content
+        for chunk in stream:
 
-        if not answer:
-            messages.pop()
-            print("Request failed: the provider returned an empty response.")
-            continue
+            if chunk.usage is not None:
+                usage = chunk.usage
 
-        if choice.finish_reason == "length":
+            if not chunk.choices:
+                continue
+
+            choice = chunk.choices[0]
+            content = choice.delta.content
+
+            if content:
+                answer.append(content)
+                print(content, end="", flush=True)
+
+            if choice.finish_reason is not None:
+                finish_reason = choice.finish_reason
+
+        answer = "".join(answer)
+
+        if finish_reason == "length":
             print("Warning: the answer may be incomplete.")
 
-        print(f"Assistant: {answer}")
+        if usage:
+            print("\n-----")
+            print("Prompt tokens:", usage.prompt_tokens)
+            print("Completion tokens:", usage.completion_tokens)
+            print("Total tokens:", usage.total_tokens)
 
-        if completion.usage and completion.usage.total_tokens is not None:
-            print(f"Tokens: {completion.usage.total_tokens}")
+            reasoning_tokens = (
+                usage.completion_tokens_details.reasoning_tokens
+                if usage.completion_tokens_details
+                else None
+            )
+
+            print("Reasoning tokens:", reasoning_tokens)
+            print("Cost:", getattr(usage, "cost", None))
+            print("-----\n")
 
         messages.append(
             {
