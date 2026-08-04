@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from utils import get_required_config, read_input
 
@@ -60,39 +60,45 @@ def main():
         finish_reason = None
         answer = []
 
-        with client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            stream=True,
-            stream_options={"include_usage": True},
-            extra_body={
-                "reasoning": {
-                    "effort": "low",
-                    "exclude": True,
-                }
-            },
-        ) as stream:
+        try:
+            with client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                top_p=top_p,
+                stream=True,
+                stream_options={"include_usage": True},
+                extra_body={
+                    "reasoning": {
+                        "effort": "low",
+                        "exclude": True,
+                    }
+                },
+            ) as stream:
 
-            for chunk in stream:
+                for chunk in stream:
 
-                if chunk.usage is not None:
-                    usage = chunk.usage
+                    if chunk.usage is not None:
+                        usage = chunk.usage
 
-                if not chunk.choices:
-                    continue
+                    if not chunk.choices:
+                        continue
 
-                choice = chunk.choices[0]
-                content = choice.delta.content
+                    choice = chunk.choices[0]
+                    content = choice.delta.content
 
-                if content:
-                    answer.append(content)
-                    print(content, end="", flush=True)
+                    if content:
+                        answer.append(content)
+                        print(content, end="", flush=True)
 
-                if choice.finish_reason is not None:
-                    finish_reason = choice.finish_reason
+                    if choice.finish_reason is not None:
+                        finish_reason = choice.finish_reason
+
+        except OpenAIError as error:
+            messages.pop()
+            print(f"\nRequest failed: {error}")
+            continue
 
         answer = "".join(answer)
 
