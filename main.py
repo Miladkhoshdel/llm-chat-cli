@@ -1,58 +1,17 @@
-from math import isfinite
-
-from decouple import config
 from openai import OpenAI, OpenAIError
 
-
-def get_required_config(name):
-    value = config(name, cast=str, default="").strip()
-
-    if not value:
-        raise ValueError(f"{name} is missing or empty in .env")
-
-    return value
-
-
-def read_input(prompt):
-    try:
-        return input(prompt).strip()
-    except (EOFError, KeyboardInterrupt):
-        print("\nGoodbye!")
-        return None
-
-
-def read_number(prompt, number_type, minimum, maximum=None):
-    while True:
-        raw_value = read_input(prompt)
-
-        if raw_value is None:
-            return None
-
-        try:
-            value = number_type(raw_value)
-        except ValueError:
-            print("Please enter a valid number.")
-            continue
-
-        if not isfinite(value):
-            print("Please enter a finite number.")
-            continue
-
-        if value < minimum or (maximum is not None and value > maximum):
-            if maximum is None:
-                print(f"Value must be at least {minimum}.")
-            else:
-                print(f"Value must be between {minimum} and {maximum}.")
-            continue
-
-        return value
+from utils import get_required_config, read_input
 
 
 def main():
     try:
-        api_key = get_required_config("API_KEY")
-        base_url = get_required_config("BASE_URL")
-        model_name = get_required_config("MODEL_NAME")
+        api_key = get_required_config("API_KEY", cast=str)
+        base_url = get_required_config("BASE_URL", cast=str)
+        model_name = get_required_config("MODEL_NAME", cast=str)
+        show_usage = get_required_config("SHOW_USAGE", cast=bool)
+        max_tokens = get_required_config("MAX_TOKENS", cast=int)
+        temperature = get_required_config("TEMPERATURE", cast=float)
+        top_p = get_required_config("TOP_P", cast=float)
     except ValueError as error:
         print(f"Configuration error: {error}")
         return 1
@@ -73,18 +32,6 @@ def main():
 
         print("Please enter a system rule.")
 
-    max_tokens = read_number("Max tokens: ", int, 1)
-    if max_tokens is None:
-        return 0
-
-    temperature = read_number("Temperature (0-2): ", float, 0, 2)
-    if temperature is None:
-        return 0
-
-    top_p = read_number("Top-p (0-1): ", float, 0, 1)
-    if top_p is None:
-        return 0
-
     messages = [
         {
             "role": "system",
@@ -93,7 +40,7 @@ def main():
     ]
 
     while True:
-        user_input = read_input("You: ")
+        user_input = read_input("\nYou: ")
 
         if user_input is None or user_input.lower() in {"exit", "quit"}:
             return 0
@@ -109,45 +56,70 @@ def main():
             }
         )
 
+        usage = None
+        finish_reason = None
+        answer = []
+
         try:
-            completion = client.chat.completions.create(
+            with client.chat.completions.create(
                 model=model_name,
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 top_p=top_p,
+                stream=True,
+                stream_options={"include_usage": show_usage},
                 extra_body={
                     "reasoning": {
                         "effort": "low",
                         "exclude": True,
                     }
                 },
-            )
+            ) as stream:
+
+                for chunk in stream:
+
+                    if chunk.usage is not None:
+                        usage = chunk.usage
+
+                    if not chunk.choices:
+                        continue
+
+                    choice = chunk.choices[0]
+                    content = choice.delta.content
+
+                    if content:
+                        answer.append(content)
+                        print(content, end="", flush=True)
+
+                    if choice.finish_reason is not None:
+                        finish_reason = choice.finish_reason
+
         except OpenAIError as error:
             messages.pop()
-            print(f"Request failed: {error}")
+            print(f"\nRequest failed: {error}")
             continue
 
-        if not completion.choices:
-            messages.pop()
-            print("Request failed: the provider returned no response choices.")
-            continue
+        answer = "".join(answer)
 
-        choice = completion.choices[0]
-        answer = choice.message.content
-
-        if not answer:
-            messages.pop()
-            print("Request failed: the provider returned an empty response.")
-            continue
-
-        if choice.finish_reason == "length":
+        if finish_reason == "length":
             print("Warning: the answer may be incomplete.")
 
-        print(f"Assistant: {answer}")
+        if show_usage and usage:
+            print("\n-----")
+            print("Prompt tokens:", usage.prompt_tokens)
+            print("Completion tokens:", usage.completion_tokens)
+            print("Total tokens:", usage.total_tokens)
 
-        if completion.usage and completion.usage.total_tokens is not None:
-            print(f"Tokens: {completion.usage.total_tokens}")
+            reasoning_tokens = (
+                usage.completion_tokens_details.reasoning_tokens
+                if usage.completion_tokens_details
+                else None
+            )
+
+            print("Reasoning tokens:", reasoning_tokens)
+            print("Cost:", getattr(usage, "cost", None))
+            print("-----\n")
 
         messages.append(
             {
