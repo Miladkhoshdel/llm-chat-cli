@@ -73,6 +73,7 @@ def main():
         )
 
         usage = None
+        finish_reason = None
         answer = []
 
         for chunk in stream:
