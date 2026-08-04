@@ -20,7 +20,7 @@ client = OpenAI(
 messages = [
     {
         "role": "system",
-        "content": "You are a perfect chef in a restaurant. answer by a single sentence with max 50 words.",
+        "content": " You are a Python programming language teacher. Answer in a single sentence of no more than 50 words.",
     }
 ]
 
@@ -41,6 +41,9 @@ while True:
     completion = client.chat.completions.create(
         model="openai/gpt-oss-20b:free",
         messages=messages,
+        max_tokens=500,
+        temperature=0.1,
+        top_p=0.9,
         extra_body={
             "reasoning": {
                 "effort": "low",
@@ -49,10 +52,16 @@ while True:
         },
     )
 
-    answer = completion.choices[0].message.content
+    choice = completion.choices[0]
+
+    if choice.finish_reason == "length":
+        print("Warning: the answer may be incomplete.")
+
+    answer = choice.message.content
 
     print(f"Assistant: {answer}")
-    print(f"Tokens: {completion.usage.total_tokens}")
+    if completion.usage:
+        print(f"Tokens: {completion.usage.total_tokens}")
 
     messages.append(
         {
