@@ -3,13 +3,18 @@ from math import isfinite
 from decouple import config
 
 
-def get_required_config(name):
-    value = config(name, cast=str, default="").strip()
+def get_required_config(name, cast):
+    raw_value = config(name, default=None)
 
-    if not value:
+    if raw_value is None or not str(raw_value).strip():
         raise ValueError(f"{name} is missing or empty in .env")
 
-    return value
+    try:
+        value = config(name, cast=cast)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} has an invalid value: {error}") from error
+
+    return value.strip() if isinstance(value, str) else value
 
 
 def read_input(prompt):

@@ -5,9 +5,13 @@ from utils import get_required_config, read_input, read_number
 
 def main():
     try:
-        api_key = get_required_config("API_KEY")
-        base_url = get_required_config("BASE_URL")
-        model_name = get_required_config("MODEL_NAME")
+        api_key = get_required_config("API_KEY", cast=str)
+        base_url = get_required_config("BASE_URL", cast=str)
+        model_name = get_required_config("MODEL_NAME", cast=str)
+        show_usage = get_required_config("SHOW_USAGE", cast=bool)
+        max_tokens = get_required_config("MAX_TOKENS", cast=int)
+        temperature = get_required_config("TEMPERATURE", cast=float)
+        top_p = get_required_config("TOP_P", cast=float)
     except ValueError as error:
         print(f"Configuration error: {error}")
         return 1
@@ -27,18 +31,6 @@ def main():
             break
 
         print("Please enter a system rule.")
-
-    max_tokens = read_number("Max tokens: ", int, 1)
-    if max_tokens is None:
-        return 0
-
-    temperature = read_number("Temperature (0-2): ", float, 0, 2)
-    if temperature is None:
-        return 0
-
-    top_p = read_number("Top-p (0-1): ", float, 0, 1)
-    if top_p is None:
-        return 0
 
     messages = [
         {
@@ -106,7 +98,7 @@ def main():
         if finish_reason == "length":
             print("Warning: the answer may be incomplete.")
 
-        if usage:
+        if show_usage and usage:
             print("\n-----")
             print("Prompt tokens:", usage.prompt_tokens)
             print("Completion tokens:", usage.completion_tokens)
