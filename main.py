@@ -1,6 +1,6 @@
-from openai import OpenAI, OpenAIError
+from openai import OpenAI
 
-from utils import get_required_config, read_input, read_number
+from utils import get_required_config, read_input
 
 
 def main():
@@ -56,7 +56,11 @@ def main():
             }
         )
 
-        stream = client.chat.completions.create(
+        usage = None
+        finish_reason = None
+        answer = []
+
+        with client.chat.completions.create(
             model=model_name,
             messages=messages,
             max_tokens=max_tokens,
@@ -70,29 +74,25 @@ def main():
                     "exclude": True,
                 }
             },
-        )
+        ) as stream:
 
-        usage = None
-        finish_reason = None
-        answer = []
+            for chunk in stream:
 
-        for chunk in stream:
+                if chunk.usage is not None:
+                    usage = chunk.usage
 
-            if chunk.usage is not None:
-                usage = chunk.usage
+                if not chunk.choices:
+                    continue
 
-            if not chunk.choices:
-                continue
+                choice = chunk.choices[0]
+                content = choice.delta.content
 
-            choice = chunk.choices[0]
-            content = choice.delta.content
+                if content:
+                    answer.append(content)
+                    print(content, end="", flush=True)
 
-            if content:
-                answer.append(content)
-                print(content, end="", flush=True)
-
-            if choice.finish_reason is not None:
-                finish_reason = choice.finish_reason
+                if choice.finish_reason is not None:
+                    finish_reason = choice.finish_reason
 
         answer = "".join(answer)
 
