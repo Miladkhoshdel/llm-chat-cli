@@ -1,19 +1,19 @@
 # LLM Chat CLI
 
-A simple Python command-line application for chatting with an LLM through an
-OpenAI-compatible API.
+A Python command-line chatbot that communicates with an LLM through an
+OpenAI-compatible API. Responses are streamed to the terminal as they are
+generated, and conversation history is preserved for the current session.
 
-## Current features
+## Features
 
-- Interactive conversations directly in the terminal
+- Streamed responses displayed as soon as chunks arrive
 - Conversation history preserved during the current session
-- Configurable API key, base URL, and model name through environment variables
+- API, model, generation, and usage settings configured through `.env`
 - A custom system rule entered by the user when each session starts
-- User-configurable `max_tokens`, `temperature`, and `top_p` for each session
 - Low-effort reasoning configuration for compatible providers
-- Total token usage displayed when the API returns usage information
+- Optional prompt, completion, reasoning, total-token, and cost reporting
 - A warning when a response stops because it reached the token limit
-- Friendly messages for configuration, API, and empty-response errors
+- Graceful configuration and API error handling
 - `exit` and `quit` commands for ending the conversation
 
 ## Requirements
@@ -51,28 +51,133 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Then add your provider credentials to `.env`:
+Then configure `.env` for your API provider:
 
 ```env
 API_KEY=your_api_key
 BASE_URL=https://your-provider.example/v1
 MODEL_NAME=your_model_name
+SHOW_USAGE=true
+MAX_TOKENS=1000
+TEMPERATURE=0.2
+TOP_P=1.0
 ```
 
 The `.env` file is ignored by Git, so credentials are not committed to the
 repository.
 
-`MODEL_NAME` must match a model identifier supported by your provider.
+All variables are currently required. `MODEL_NAME` must be an exact model ID
+supported by the configured provider.
 
-## Interactive session settings
+## Environment variable reference
 
-The following values are requested in the terminal each time the application
-starts; they are not read from `.env`:
+| Variable | Type | Valid value | Recommended starting value | Purpose |
+| --- | --- | --- | --- | --- |
+| `API_KEY` | String | Non-empty provider API key | Your secret key | Authenticates API requests |
+| `BASE_URL` | String | Valid compatible API base URL | Your provider's API URL | Selects the API endpoint |
+| `MODEL_NAME` | String | Exact provider model ID | A supported model ID | Selects the model |
+| `SHOW_USAGE` | Boolean | `true` or `false` | `true` | Shows usage after each response |
+| `MAX_TOKENS` | Integer | `1` or greater | `1000` | Limits completion tokens per response |
+| `TEMPERATURE` | Number | `0` through `2` | `0.2` or `0.7` | Controls randomness |
+| `TOP_P` | Number | `0` through `1` | `1.0` | Limits sampling to likely tokens |
 
-- **System rule:** Instructions that define the assistant's role and behavior
-- **Max tokens:** A positive integer that limits the generated response
-- **Temperature:** A number from `0` to `2`; lower values are more predictable
-- **Top-p:** A number from `0` to `1` that controls token sampling
+Providers and individual models may enforce narrower limits than the ranges
+above. Invalid values are rejected either during configuration parsing or by
+the API provider.
+
+### Choosing `MAX_TOKENS`
+
+`MAX_TOKENS` limits the output token budget; it does not represent a number of
+words. For reasoning models, reasoning tokens can consume part of this budget.
+
+- `200` to `500`: concise answers and simple chat
+- `500` to `1000`: a useful general-purpose range
+- `1000` to `4000`: detailed explanations or longer generated content
+
+Larger values do not force the model to produce a long answer. They only allow
+it to produce up to that limit. A request can still stop earlier with
+`finish_reason="stop"`. If it stops with `finish_reason="length"`, increase
+`MAX_TOKENS` or request a shorter response.
+
+### Choosing `TEMPERATURE`
+
+Temperature changes how strongly the model favors its most likely next token.
+
+- `0` to `0.2`: extraction, classification, factual answers, and predictable output
+- `0.5` to `0.7`: balanced general conversation
+- `0.8` to `1.2`: brainstorming and creative writing
+- Above `1.2`: increasingly unpredictable; rarely needed
+
+Even `TEMPERATURE=0` does not guarantee identical output on every request.
+
+### Choosing `TOP_P`
+
+Top-p removes low-probability token choices until the remaining candidates
+reach the configured cumulative probability.
+
+- `1.0`: keep the full candidate distribution; recommended when adjusting temperature
+- `0.9` to `0.95`: slightly restrict unlikely choices
+- Below `0.8`: strongly restricted output that may become repetitive
+
+Although the API allows temperature and top-p to be changed together, it is
+easier to tune one control at a time. A good default is:
+
+```env
+TEMPERATURE=0.7
+TOP_P=1.0
+```
+
+### Suggested presets
+
+Predictable technical assistant:
+
+```env
+MAX_TOKENS=1000
+TEMPERATURE=0.2
+TOP_P=1.0
+```
+
+Balanced general chatbot:
+
+```env
+MAX_TOKENS=1000
+TEMPERATURE=0.7
+TOP_P=1.0
+```
+
+Creative assistant:
+
+```env
+MAX_TOKENS=1500
+TEMPERATURE=1.0
+TOP_P=1.0
+```
+
+## Streaming
+
+Streaming is always enabled. Instead of waiting for a complete response, the
+application processes and prints each content chunk as it arrives. The chunks
+are collected and joined into a complete assistant message before that message
+is added to conversation history.
+
+Streaming improves perceived responsiveness, but it does not reduce token
+usage, reasoning, cost, or necessarily the total generation time. The stream
+closes automatically after normal completion or an exception.
+
+When `SHOW_USAGE=true`, the application requests usage information in the
+stream and displays it after generation. Some compatible providers may not
+return every provider-specific field, such as reasoning tokens or cost.
+
+## System rule
+
+The system rule is the only setting requested when the program starts. It
+defines the assistant's role and behavior for the entire conversation:
+
+```text
+System rule: You are a concise Python programming teacher.
+```
+
+Empty system rules are rejected.
 
 ## Usage
 
@@ -86,22 +191,58 @@ Example:
 
 ```text
 System rule: You are a concise Python programming teacher.
-Max tokens: 500
-Temperature (0-2): 0.1
-Top-p (0-1): 0.9
+
 You: Explain a Python list in one sentence.
-Assistant: A Python list is an ordered, mutable collection of values.
+A Python list is an ordered, mutable collection of values.
+-----
+Prompt tokens: 24
+Completion tokens: 15
+Total tokens: 39
+Reasoning tokens: 0
+Cost: 0
+-----
 ```
 
 Continue entering messages at the `You:` prompt. Type `exit` or `quit` to close
-the application. Invalid or empty settings are rejected and requested again.
+the application.
+
+## Troubleshooting
+
+### Configuration error
+
+Confirm every required variable exists in `.env`, has no surrounding quotes
+unless they are part of the value, and uses a valid type. In particular:
+
+```env
+SHOW_USAGE=true
+MAX_TOKENS=1000
+TEMPERATURE=0.7
+TOP_P=1.0
+```
+
+### Usage information is not displayed
+
+Set `SHOW_USAGE=true`. Usage is delivered near the end of the stream, and some
+OpenAI-compatible providers may omit it or omit provider-specific fields.
+
+### Response is incomplete
+
+If the program reports that the finish reason was `length`, increase
+`MAX_TOKENS` or ask for a shorter response. Reasoning models may use a portion
+of the completion budget before producing visible text.
+
+### Rate-limit or provider error
+
+Wait before retrying a rate-limited request, reduce request frequency, or use a
+different available model/provider. Free model availability can fluctuate.
 
 ## Current limitations
 
 - Conversation history is stored only in memory and is lost when the program
   exits.
+- Conversation history currently grows without automatic trimming or
+  summarization and may eventually exceed the model's context limit.
 - The system rule must be entered again when a new session starts.
-- Generation settings must be entered again when a new session starts.
 - The reasoning configuration may not be supported by every OpenAI-compatible
   provider.
 
