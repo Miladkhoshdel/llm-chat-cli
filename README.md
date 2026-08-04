@@ -153,6 +153,71 @@ TEMPERATURE=1.0
 TOP_P=1.0
 ```
 
+## Provider compatibility
+
+The current implementation is compatible with OpenRouter, including streaming,
+usage reporting, and its configured reasoning options. Other providers may
+require some of the adaptations described below.
+
+"OpenAI-compatible" does not mean that every provider supports every request
+parameter or response field. Compatibility is often limited to the basic
+Chat Completions request and response structure. Model capabilities can also
+differ within the same provider.
+
+The following parts of this application may require changes when switching
+providers or models:
+
+| Parameter or field | Possible incompatibility | What to check or change |
+| --- | --- | --- |
+| `BASE_URL` | Every provider uses its own endpoint | Set the exact API base URL supplied by the provider |
+| `MODEL_NAME` | Model identifiers are provider-specific | Use an exact model ID listed by the provider |
+| Chat Completions | Some APIs support another response endpoint instead, or implement Chat Completions only partially | Confirm that the provider supports streamed Chat Completions |
+| `max_tokens` | Some models use `max_completion_tokens` instead; reasoning models may reject `max_tokens` | Rename the request argument when required by the selected API/model |
+| `temperature` | Some reasoning models reject or ignore sampling controls | Omit it when the selected model does not support it |
+| `top_p` | Some reasoning models reject or ignore sampling controls | Omit it when the selected model does not support it |
+| `extra_body.reasoning` | Reasoning configuration is not standardized across providers | Remove it, rename it, or use the provider's supported reasoning parameter |
+| `reasoning.effort` | Supported effort names and levels differ by model | Check whether values such as `low` are supported |
+| `reasoning.exclude` | Some providers never return reasoning text; others use a different option | Remove this field if it is unsupported |
+| `stream_options.include_usage` | Some providers stream text but do not send a final usage chunk | Allow `usage` to remain `None` |
+| `usage.completion_tokens_details.reasoning_tokens` | Reasoning-token details are optional | Check for `None` before accessing nested fields |
+| `usage.cost` | Cost is not part of every compatible usage object | Treat missing cost as normal or calculate it separately |
+| `finish_reason` | Providers may return different finish-reason values | Handle unknown values without crashing |
+
+The current implementation is most likely to need changes in these two places:
+
+```python
+max_tokens=max_tokens
+```
+
+Some APIs and models require:
+
+```python
+max_completion_tokens=max_tokens
+```
+
+The reasoning object is also provider-dependent:
+
+```python
+extra_body={
+    "reasoning": {
+        "effort": "low",
+        "exclude": True,
+    }
+}
+```
+
+If a provider rejects an unknown parameter, remove that parameter or replace it
+with the provider's documented equivalent. Do not assume that changing only
+`BASE_URL` and `MODEL_NAME` guarantees full compatibility.
+
+Before switching providers:
+
+1. Confirm support for the Chat Completions endpoint and streaming.
+2. Set the provider's exact base URL and model ID.
+3. Verify the supported token-limit and reasoning parameters.
+4. Check whether the selected model supports temperature and top-p.
+5. Send one small test request and inspect its chunks, finish reason, and usage.
+
 ## Streaming
 
 Streaming is always enabled. Instead of waiting for a complete response, the
