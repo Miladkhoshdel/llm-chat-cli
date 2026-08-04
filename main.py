@@ -68,7 +68,7 @@ def main():
                 temperature=temperature,
                 top_p=top_p,
                 stream=True,
-                stream_options={"include_usage": True},
+                stream_options={"include_usage": show_usage},
                 extra_body={
                     "reasoning": {
                         "effort": "low",
