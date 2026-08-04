@@ -26,7 +26,7 @@ OpenAI-compatible API.
 Clone the repository and enter its directory:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Miladkhoshdel/llm-chat-cli
 cd llm-chat-cli
 ```
 
