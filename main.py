@@ -3,6 +3,18 @@ from openai import OpenAI, OpenAIError
 from utils import get_required_config, read_input
 
 
+def trim_history(messages, keep_count):
+    """Keep the system message and the latest completed exchanges."""
+    if keep_count < 0:
+        raise ValueError("MEMORY_KEEP_COUNT must be 0 or greater")
+
+    if keep_count == 0:
+        return messages[:1]
+
+    conversation = messages[1:]
+    return messages[:1] + conversation[-(keep_count * 2) :]
+
+
 def main():
     try:
         api_key = get_required_config("API_KEY", cast=str)
@@ -12,6 +24,10 @@ def main():
         max_tokens = get_required_config("MAX_TOKENS", cast=int)
         temperature = get_required_config("TEMPERATURE", cast=float)
         top_p = get_required_config("TOP_P", cast=float)
+        memory_keep_count = get_required_config("MEMORY_KEEP_COUNT", cast=int)
+
+        if memory_keep_count < 0:
+            raise ValueError("MEMORY_KEEP_COUNT must be 0 or greater")
     except ValueError as error:
         print(f"Configuration error: {error}")
         return 1
@@ -127,6 +143,7 @@ def main():
                 "content": answer,
             }
         )
+        messages = trim_history(messages, memory_keep_count)
 
 
 if __name__ == "__main__":
