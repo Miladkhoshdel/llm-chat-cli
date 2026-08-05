@@ -7,7 +7,7 @@ generated, and conversation history is preserved for the current session.
 ## Features
 
 - Streamed responses displayed as soon as chunks arrive
-- Conversation history preserved during the current session
+- A configurable number of recent exchanges preserved during the current session
 - API, model, generation, and usage settings configured through `.env`
 - A custom system rule entered by the user when each session starts
 - Low-effort reasoning configuration for compatible providers
@@ -61,6 +61,7 @@ SHOW_USAGE=true
 MAX_TOKENS=1000
 TEMPERATURE=0.2
 TOP_P=1.0
+MEMORY_KEEP_COUNT=10
 ```
 
 The `.env` file is ignored by Git, so credentials are not committed to the
@@ -80,6 +81,7 @@ supported by the configured provider.
 | `MAX_TOKENS` | Integer | `1` or greater | `1000` | Limits completion tokens per response |
 | `TEMPERATURE` | Number | `0` through `2` | `0.2` or `0.7` | Controls randomness |
 | `TOP_P` | Number | `0` through `1` | `1.0` | Limits sampling to likely tokens |
+| `MEMORY_KEEP_COUNT` | Integer | `0` or greater | `10` | Keeps this many completed exchanges in conversation history |
 
 Providers and individual models may enforce narrower limits than the ranges
 above. Invalid values are rejected either during configuration parsing or by
@@ -233,6 +235,16 @@ When `SHOW_USAGE=true`, the application requests usage information in the
 stream and displays it after generation. Some compatible providers may not
 return every provider-specific field, such as reasoning tokens or cost.
 
+## Conversation memory
+
+`MEMORY_KEEP_COUNT` controls how many completed user/assistant exchanges are
+sent with the next request. The system rule is always retained. For example,
+`MEMORY_KEEP_COUNT=10` keeps the latest ten exchanges and removes older ones
+after each successful response.
+
+Set `MEMORY_KEEP_COUNT=0` to keep only the system rule between prompts. This
+makes each new prompt independent of earlier prompts in the same session.
+
 ## System rule
 
 The system rule is the only setting requested when the program starts. It
@@ -283,6 +295,7 @@ SHOW_USAGE=true
 MAX_TOKENS=1000
 TEMPERATURE=0.7
 TOP_P=1.0
+MEMORY_KEEP_COUNT=10
 ```
 
 ### Usage information is not displayed
@@ -305,8 +318,8 @@ different available model/provider. Free model availability can fluctuate.
 
 - Conversation history is stored only in memory and is lost when the program
   exits.
-- Conversation history currently grows without automatic trimming or
-  summarization and may eventually exceed the model's context limit.
+- Old conversation exchanges are removed rather than summarized when the
+  configured memory limit is reached.
 - The system rule must be entered again when a new session starts.
 - The reasoning configuration may not be supported by every OpenAI-compatible
   provider.
