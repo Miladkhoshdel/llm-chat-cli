@@ -12,7 +12,8 @@ def trim_history(messages, keep_count):
         return messages[:1]
 
     conversation = messages[1:]
-    return messages[:1] + conversation[-(keep_count * 2) :]
+    conversation_start = -(keep_count * 2)
+    return messages[:1] + conversation[conversation_start:]
 
 
 def main():
