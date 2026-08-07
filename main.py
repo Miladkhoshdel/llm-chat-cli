@@ -1,6 +1,6 @@
 from openai import OpenAI, OpenAIError
 
-from utils import get_required_config, read_input
+from utils import calculate_input_token_budget, get_required_config, read_input
 
 
 def trim_history(messages, keep_count):
@@ -26,6 +26,11 @@ def main():
         temperature = get_required_config("TEMPERATURE", cast=float)
         top_p = get_required_config("TOP_P", cast=float)
         memory_keep_count = get_required_config("MEMORY_KEEP_COUNT", cast=int)
+        max_context_tokens = get_required_config(
+            "MAX_CONTEXT_TOKENS",
+            cast=int,
+        )
+        calculate_input_token_budget(max_context_tokens, max_tokens)
 
         if memory_keep_count < 0:
             raise ValueError("MEMORY_KEEP_COUNT must be 0 or greater")

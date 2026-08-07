@@ -23,4 +23,18 @@ def read_input(prompt):
         return None
 
 
-__all__ = ["get_required_config", "read_input"]
+def calculate_input_token_budget(context_limit, output_limit):
+    """Calculate how many tokens are available for input messages."""
+    if context_limit <= 0:
+        raise ValueError("MAX_CONTEXT_TOKENS must be greater than 0")
+
+    if output_limit <= 0:
+        raise ValueError("MAX_TOKENS must be greater than 0")
+
+    if output_limit >= context_limit:
+        raise ValueError("MAX_TOKENS must be smaller than MAX_CONTEXT_TOKENS")
+
+    return context_limit - output_limit
+
+
+__all__ = ["calculate_input_token_budget", "get_required_config", "read_input"]
