@@ -1,6 +1,7 @@
 from openai import OpenAI, OpenAIError
 
-from utils import calculate_input_token_budget, get_required_config, read_input
+from settings import load_settings
+from utils import read_input
 
 
 def trim_history(messages, keep_count):
@@ -18,29 +19,14 @@ def trim_history(messages, keep_count):
 
 def main():
     try:
-        api_key = get_required_config("API_KEY", cast=str)
-        base_url = get_required_config("BASE_URL", cast=str)
-        model_name = get_required_config("MODEL_NAME", cast=str)
-        show_usage = get_required_config("SHOW_USAGE", cast=bool)
-        max_tokens = get_required_config("MAX_TOKENS", cast=int)
-        temperature = get_required_config("TEMPERATURE", cast=float)
-        top_p = get_required_config("TOP_P", cast=float)
-        memory_keep_count = get_required_config("MEMORY_KEEP_COUNT", cast=int)
-        max_context_tokens = get_required_config(
-            "MAX_CONTEXT_TOKENS",
-            cast=int,
-        )
-        calculate_input_token_budget(max_context_tokens, max_tokens)
-
-        if memory_keep_count < 0:
-            raise ValueError("MEMORY_KEEP_COUNT must be 0 or greater")
+        settings = load_settings()
     except ValueError as error:
         print(f"Configuration error: {error}")
         return 1
 
     client = OpenAI(
-        base_url=base_url,
-        api_key=api_key,
+        base_url=settings.base_url,
+        api_key=settings.api_key,
     )
 
     while True:
@@ -84,13 +70,13 @@ def main():
 
         try:
             with client.chat.completions.create(
-                model=model_name,
+                model=settings.model_name,
                 messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                top_p=top_p,
+                max_tokens=settings.max_tokens,
+                temperature=settings.temperature,
+                top_p=settings.top_p,
                 stream=True,
-                stream_options={"include_usage": show_usage},
+                stream_options={"include_usage": settings.show_usage},
                 extra_body={
                     "reasoning": {
                         "effort": "low",
@@ -127,7 +113,7 @@ def main():
         if finish_reason == "length":
             print("Warning: the answer may be incomplete.")
 
-        if show_usage and usage:
+        if settings.show_usage and usage:
             print("\n-----")
             print("Prompt tokens:", usage.prompt_tokens)
             print("Completion tokens:", usage.completion_tokens)
@@ -149,7 +135,7 @@ def main():
                 "content": answer,
             }
         )
-        messages = trim_history(messages, memory_keep_count)
+        messages = trim_history(messages, settings.memory_keep_count)
 
 
 if __name__ == "__main__":
