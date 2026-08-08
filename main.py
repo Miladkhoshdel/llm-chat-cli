@@ -1,6 +1,6 @@
-from openai import OpenAI, OpenAIError
+from openai import OpenAIError
 
-from llm import LLMResponse, LLMUsage
+from llm import LLM
 from settings import load_settings
 from utils import print_usage, read_input
 
@@ -25,10 +25,7 @@ def main():
         print(f"Configuration error: {error}")
         return 1
 
-    client = OpenAI(
-        base_url=settings.base_url,
-        api_key=settings.api_key,
-    )
+    model = LLM(settings)
 
     while True:
         system_rule = read_input("System rule: ")
@@ -65,77 +62,15 @@ def main():
             }
         )
 
-        usage = None
-        finish_reason = None
-        answer = []
-
         try:
-            with client.chat.completions.create(
-                model=settings.model_name,
-                messages=messages,
-                max_tokens=settings.max_tokens,
-                temperature=settings.temperature,
-                top_p=settings.top_p,
-                stream=True,
-                stream_options={"include_usage": settings.show_usage},
-                extra_body={
-                    "reasoning": {
-                        "effort": "low",
-                        "exclude": True,
-                    }
-                },
-            ) as stream:
-
-                for chunk in stream:
-
-                    if chunk.usage is not None:
-                        usage = chunk.usage
-
-                    if not chunk.choices:
-                        continue
-
-                    choice = chunk.choices[0]
-                    content = choice.delta.content
-
-                    if content:
-                        answer.append(content)
-                        print(content, end="", flush=True)
-
-                    if choice.finish_reason is not None:
-                        finish_reason = choice.finish_reason
-
+            response = model.complete(
+                messages,
+                on_text=lambda text: print(text, end="", flush=True),
+            )
         except OpenAIError as error:
             messages.pop()
             print(f"\nRequest failed: {error}")
             continue
-
-        response_usage = None
-
-        if usage is not None:
-
-            completion_details = getattr(
-                usage,
-                "completion_tokens_details",
-                None,
-            )
-
-            response_usage = LLMUsage(
-                prompt_tokens=usage.prompt_tokens,
-                completion_tokens=usage.completion_tokens,
-                total_tokens=usage.total_tokens,
-                reasoning_tokens=getattr(
-                    completion_details,
-                    "reasoning_tokens",
-                    None,
-                ),
-                cost=getattr(usage, "cost", None),
-            )
-
-        response = LLMResponse(
-            content="".join(answer),
-            finish_reason=finish_reason,
-            usage=response_usage,
-        )
 
         if response.finish_reason == "length":
             print("Warning: the answer may be incomplete.")
