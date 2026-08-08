@@ -1,7 +1,8 @@
 from openai import OpenAI, OpenAIError
 
+from llm import LLMResponse, LLMUsage
 from settings import load_settings
-from utils import read_input
+from utils import print_usage, read_input
 
 
 def trim_history(messages, keep_count):
@@ -108,31 +109,44 @@ def main():
             print(f"\nRequest failed: {error}")
             continue
 
-        answer = "".join(answer)
+        response_usage = None
 
-        if finish_reason == "length":
-            print("Warning: the answer may be incomplete.")
+        if usage is not None:
 
-        if settings.show_usage and usage:
-            print("\n-----")
-            print("Prompt tokens:", usage.prompt_tokens)
-            print("Completion tokens:", usage.completion_tokens)
-            print("Total tokens:", usage.total_tokens)
-
-            reasoning_tokens = (
-                usage.completion_tokens_details.reasoning_tokens
-                if usage.completion_tokens_details
-                else None
+            completion_details = getattr(
+                usage,
+                "completion_tokens_details",
+                None,
             )
 
-            print("Reasoning tokens:", reasoning_tokens)
-            print("Cost:", getattr(usage, "cost", None))
-            print("-----\n")
+            response_usage = LLMUsage(
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
+                total_tokens=usage.total_tokens,
+                reasoning_tokens=getattr(
+                    completion_details,
+                    "reasoning_tokens",
+                    None,
+                ),
+                cost=getattr(usage, "cost", None),
+            )
+
+        response = LLMResponse(
+            content="".join(answer),
+            finish_reason=finish_reason,
+            usage=response_usage,
+        )
+
+        if response.finish_reason == "length":
+            print("Warning: the answer may be incomplete.")
+
+        if settings.show_usage and response.usage:
+            print_usage(response.usage)
 
         messages.append(
             {
                 "role": "assistant",
-                "content": answer,
+                "content": response.content,
             }
         )
         messages = trim_history(messages, settings.memory_keep_count)
