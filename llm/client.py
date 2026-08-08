@@ -1,6 +1,6 @@
-from dataclasses import dataclass
-
 from openai import OpenAI
+
+from .models import LLMResponse, LLMUsage
 
 
 class LLM:
@@ -89,22 +89,6 @@ class LLM:
                     finish_reason = choice.finish_reason
 
         return self.build_response(answer, finish_reason, usage)
-
-
-@dataclass(frozen=True)
-class LLMUsage:
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    reasoning_tokens: int | None = None
-    cost: float | None = None
-
-
-@dataclass(frozen=True)
-class LLMResponse:
-    content: str
-    finish_reason: str | None
-    usage: LLMUsage | None = None
 
 
 __all__ = ["LLM", "LLMResponse", "LLMUsage"]

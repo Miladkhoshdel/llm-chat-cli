@@ -1,6 +1,6 @@
 import unittest
 
-from main import trim_history
+from llm.chat import trim_history
 
 
 class TrimHistoryTests(unittest.TestCase):
