@@ -1,6 +1,6 @@
 import unittest
 
-from settings import Settings
+from llm.settings import Settings
 
 
 class SettingsTests(unittest.TestCase):
