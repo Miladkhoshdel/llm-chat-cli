@@ -1,8 +1,8 @@
-# LLM Chat CLI
+# LLM Code Review CLI
 
-A Python command-line chatbot that communicates with an LLM through an
-OpenAI-compatible API. Responses are streamed to the terminal as they are
-generated, and conversation history is preserved for the current session.
+A Python command-line code-review assistant that runs Flake8 against a project
+and uses an LLM through an OpenAI-compatible API to explain and prioritize the
+findings. The project also includes an interactive, streaming chat interface.
 
 ## Features
 
@@ -28,8 +28,8 @@ generated, and conversation history is preserved for the current session.
 Clone the repository and enter its directory:
 
 ```bash
-git clone https://github.com/Miladkhoshdel/llm-chat-cli
-cd llm-chat-cli
+git clone https://github.com/Miladkhoshdel/llm-code-review-cli
+cd llm-code-review-cli
 ```
 
 Create and activate a virtual environment:
