@@ -13,6 +13,7 @@ generated, and conversation history is preserved for the current session.
 - Low-effort reasoning configuration for compatible providers
 - Optional prompt, completion, reasoning, total-token, and cost reporting
 - A warning when a response stops because it reached the token limit
+- Flake8-based directory reviews explained in human-readable language by the LLM
 - Graceful configuration and API error handling
 - `exit` and `quit` commands for ending the conversation
 
@@ -20,6 +21,7 @@ generated, and conversation history is preserved for the current session.
 
 - Python 3.10 or newer
 - An API key for an OpenAI-compatible LLM provider
+- Flake8, installed through `requirements.txt`
 
 ## Installation
 
@@ -283,6 +285,24 @@ Cost: 0
 Continue entering messages at the `You:` prompt. Type `exit` or `quit` to close
 the application.
 
+## Code review
+
+Run a review against a Python project directory:
+
+```bash
+python3 review.py path/to/project
+```
+
+If the directory is omitted, the current directory is reviewed. The command
+runs Flake8 locally, converts its output into structured findings, and sends the
+finding details and affected source lines to the configured LLM. The resulting
+report lists likely bugs before style and maintainability issues and includes a
+suggested fix for each finding.
+
+When Flake8 finds no issues, the command prints `No Flake8 findings.` and does
+not call the LLM. Existing Flake8 configuration in the reviewed project is
+respected. Virtual-environment directories named `.venv` or `venv` are excluded.
+
 ## Troubleshooting
 
 ### Configuration error
@@ -328,3 +348,7 @@ different available model/provider. Free model availability can fluctuate.
 
 Never commit your `.env` file or API key. If a credential is exposed, revoke it
 through your provider and create a replacement.
+
+The code-review command sends Flake8 findings and the affected source lines to
+the configured LLM provider. Do not use it on code that must remain entirely
+local unless the provider is approved to receive that code.
