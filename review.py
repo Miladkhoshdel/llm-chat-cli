@@ -29,6 +29,15 @@ def print_usage(usage):
     print("-----")
 
 
+def print_findings_count(findings):
+    if findings:
+        print(f"Flake8 found {len(findings)} issue(s).\n")
+
+
+def print_stream_text(text):
+    print(text, end="", flush=True)
+
+
 def main(argv=None):
     args = build_parser().parse_args(argv)
 
@@ -41,7 +50,11 @@ def main(argv=None):
     reviewer = CodeReviewer(LLM(settings))
 
     try:
-        findings, response = reviewer.review(args.directory)
+        findings, response = reviewer.review(
+            args.directory,
+            on_text=print_stream_text,
+            on_findings=print_findings_count,
+        )
     except ValueError as error:
         print(f"Invalid review target: {error}")
         return 1
@@ -56,8 +69,8 @@ def main(argv=None):
         print("No Flake8 findings.")
         return 0
 
-    print(f"Flake8 found {len(findings)} issue(s).\n")
-    print(response.content)
+    if response.content and not response.content.endswith("\n"):
+        print()
 
     if response.finish_reason == "length":
         print("\nWarning: the LLM explanation may be incomplete.")

@@ -7,8 +7,11 @@ class CodeReviewer:
         self.llm = llm
         self.runner = runner or Flake8Runner()
 
-    def review(self, directory, on_text=None):
+    def review(self, directory, on_text=None, on_findings=None):
         findings = self.runner.run(directory)
+
+        if on_findings is not None:
+            on_findings(findings)
 
         if not findings:
             return findings, None

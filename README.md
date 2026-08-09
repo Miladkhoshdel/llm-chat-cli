@@ -296,8 +296,11 @@ python3 review.py path/to/project
 If the directory is omitted, the current directory is reviewed. The command
 runs Flake8 locally, converts its output into structured findings, and sends the
 finding details and affected source lines to the configured LLM. The resulting
-report lists likely bugs before style and maintainability issues and includes a
-suggested fix for each finding.
+report uses a compact, terminal-friendly plain-text format, lists likely bugs
+before style and maintainability issues, and includes a suggested fix for each
+kind of finding. Repeated findings are grouped with a count and up to three
+example locations instead of being expanded into a Markdown table or a long
+list of paths. The report is printed as the LLM generates it.
 
 When Flake8 finds no issues, the command prints `No Flake8 findings.` and does
 not call the LLM. Existing Flake8 configuration in the reviewed project is

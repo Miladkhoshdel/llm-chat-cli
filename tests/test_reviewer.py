@@ -34,6 +34,28 @@ class ReviewPromptTests(unittest.TestCase):
         self.assertEqual(finding_data["code"], "F821")
         self.assertEqual(finding_data["source"], "    print(missing_name)")
 
+    def test_requests_compact_plain_text_without_markdown_tables(self):
+        finding = Flake8Finding(
+            path="example.py",
+            line=1,
+            column=1,
+            code="F401",
+            message="'os' imported but unused",
+        )
+
+        messages = build_review_messages(".", [finding])
+
+        system_prompt = messages[0]["content"]
+        user_prompt = messages[1]["content"]
+        self.assertIn("compact plain text", system_prompt)
+        self.assertIn("never use Markdown tables", system_prompt)
+        self.assertIn("Group repeated findings", system_prompt)
+        self.assertIn("at most three example", system_prompt)
+        self.assertIn("do not enumerate every repeated path", system_prompt)
+        self.assertIn("Keep each item on one logical line", system_prompt)
+        self.assertIn("compact plain-text format", user_prompt)
+        self.assertNotIn("Markdown report", user_prompt)
+
 
 class CodeReviewerTests(unittest.TestCase):
     def test_does_not_call_llm_when_flake8_finds_nothing(self):
@@ -72,6 +94,31 @@ class CodeReviewerTests(unittest.TestCase):
         self.assertEqual(response, expected_response)
         messages = llm.complete.call_args.args[0]
         self.assertIn("F401", messages[1]["content"])
+
+    def test_reports_findings_before_calling_llm(self):
+        finding = Flake8Finding(
+            path="example.py",
+            line=1,
+            column=1,
+            code="F401",
+            message="'os' imported but unused",
+        )
+        events = []
+        runner = Mock()
+        runner.run.return_value = [finding]
+        llm = Mock()
+        llm.complete.side_effect = lambda messages, on_text: (
+            events.append("llm")
+            or LLMResponse(content="Remove it.", finish_reason="stop")
+        )
+        reviewer = CodeReviewer(llm, runner=runner)
+
+        reviewer.review(
+            ".",
+            on_findings=lambda findings: events.append("findings"),
+        )
+
+        self.assertEqual(events, ["findings", "llm"])
 
 
 if __name__ == "__main__":
