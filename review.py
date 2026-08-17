@@ -2,13 +2,13 @@ import argparse
 
 from openai import OpenAIError
 
-from code_review import CodeReviewer, Flake8ExecutionError
+from code_review import BlackExecutionError, CodeReviewer, Flake8ExecutionError
 from llm import LLM, load_settings
 
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Run Flake8 and explain its findings with an LLM."
+        description="Run Flake8 and Black, then explain findings with an LLM."
     )
     parser.add_argument(
         "directory",
@@ -31,7 +31,7 @@ def print_usage(usage):
 
 def print_findings_count(findings):
     if findings:
-        print(f"Flake8 found {len(findings)} issue(s).\n")
+        print(f"Static checks found {len(findings)} issue(s).\n")
 
 
 def print_stream_text(text):
@@ -61,12 +61,15 @@ def main(argv=None):
     except Flake8ExecutionError as error:
         print(f"Flake8 failed: {error}")
         return 1
+    except BlackExecutionError as error:
+        print(f"Black failed: {error}")
+        return 1
     except OpenAIError as error:
         print(f"LLM request failed: {error}")
         return 1
 
     if not findings:
-        print("No Flake8 findings.")
+        print("No Flake8 or Black findings.")
         return 0
 
     if response.content and not response.content.endswith("\n"):

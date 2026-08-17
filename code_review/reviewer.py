@@ -1,14 +1,19 @@
+from .black_runner import BlackRunner
 from .flake8_runner import Flake8Runner
 from .prompt import build_review_messages
 
 
 class CodeReviewer:
-    def __init__(self, llm, runner=None):
+    def __init__(self, llm, runner=None, black_runner=None):
         self.llm = llm
         self.runner = runner or Flake8Runner()
+        self.black_runner = black_runner or BlackRunner()
 
     def review(self, directory, on_text=None, on_findings=None):
-        findings = self.runner.run(directory)
+        findings = [
+            *self.runner.run(directory),
+            *self.black_runner.run(directory),
+        ]
 
         if on_findings is not None:
             on_findings(findings)
