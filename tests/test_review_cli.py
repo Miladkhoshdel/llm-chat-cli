@@ -41,7 +41,7 @@ class ReviewCliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(
             output.getvalue(),
-            "Flake8 found 1 issue(s).\n\nSummary: one issue\n",
+            "Static checks found 1 issue(s).\n\nSummary: one issue\n",
         )
         llm.assert_called_once_with(load_settings.return_value)
 

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from code_review.models import Flake8Finding
+from code_review.models import BlackFinding, Flake8Finding
 from code_review.prompt import build_review_messages
 from code_review.reviewer import CodeReviewer
 from llm import LLMResponse
@@ -56,13 +56,28 @@ class ReviewPromptTests(unittest.TestCase):
         self.assertIn("compact plain-text format", user_prompt)
         self.assertNotIn("Markdown report", user_prompt)
 
+    def test_includes_black_finding_without_source_location(self):
+        messages = build_review_messages(
+            ".",
+            [BlackFinding(path="example.py")],
+        )
+
+        payload = messages[1]["content"].split("\n\n", 1)[1]
+        finding_data = json.loads(payload)[0]
+        self.assertEqual(finding_data["code"], "BLACK")
+        self.assertEqual(finding_data["path"], "example.py")
+        self.assertIsNone(finding_data["line"])
+        self.assertIsNone(finding_data["source"])
+
 
 class CodeReviewerTests(unittest.TestCase):
     def test_does_not_call_llm_when_flake8_finds_nothing(self):
         runner = Mock()
         runner.run.return_value = []
+        black_runner = Mock()
+        black_runner.run.return_value = []
         llm = Mock()
-        reviewer = CodeReviewer(llm, runner=runner)
+        reviewer = CodeReviewer(llm, runner=runner, black_runner=black_runner)
 
         findings, response = reviewer.review(".")
 
@@ -80,13 +95,15 @@ class CodeReviewerTests(unittest.TestCase):
         )
         runner = Mock()
         runner.run.return_value = [finding]
+        black_runner = Mock()
+        black_runner.run.return_value = []
         llm = Mock()
         expected_response = LLMResponse(
             content="Remove the unused import.",
             finish_reason="stop",
         )
         llm.complete.return_value = expected_response
-        reviewer = CodeReviewer(llm, runner=runner)
+        reviewer = CodeReviewer(llm, runner=runner, black_runner=black_runner)
 
         findings, response = reviewer.review(".")
 
@@ -94,6 +111,29 @@ class CodeReviewerTests(unittest.TestCase):
         self.assertEqual(response, expected_response)
         messages = llm.complete.call_args.args[0]
         self.assertIn("F401", messages[1]["content"])
+
+    def test_sends_black_findings_to_llm(self):
+        runner = Mock()
+        runner.run.return_value = []
+        black_runner = Mock()
+        black_runner.run.return_value = [BlackFinding(path="example.py")]
+        llm = Mock()
+        llm.complete.return_value = LLMResponse(
+            content="Run Black on example.py.",
+            finish_reason="stop",
+        )
+        reviewer = CodeReviewer(
+            llm,
+            runner=runner,
+            black_runner=black_runner,
+        )
+
+        findings, response = reviewer.review(".")
+
+        self.assertEqual(findings[0].code, "BLACK")
+        self.assertEqual(response.content, "Run Black on example.py.")
+        messages = llm.complete.call_args.args[0]
+        self.assertIn("BLACK", messages[1]["content"])
 
     def test_reports_findings_before_calling_llm(self):
         finding = Flake8Finding(
@@ -106,12 +146,14 @@ class CodeReviewerTests(unittest.TestCase):
         events = []
         runner = Mock()
         runner.run.return_value = [finding]
+        black_runner = Mock()
+        black_runner.run.return_value = []
         llm = Mock()
         llm.complete.side_effect = lambda messages, on_text: (
             events.append("llm")
             or LLMResponse(content="Remove it.", finish_reason="stop")
         )
-        reviewer = CodeReviewer(llm, runner=runner)
+        reviewer = CodeReviewer(llm, runner=runner, black_runner=black_runner)
 
         reviewer.review(
             ".",
